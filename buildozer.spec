@@ -63,5 +63,5 @@ android.allow_backup = True
 
 [python-for-android]
 
-# (str) Python-for-Android bootstrap
 p4a.bootstrap = sdl2
+p4a.branch = develop
