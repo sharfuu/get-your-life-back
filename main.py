@@ -432,7 +432,7 @@ class HomeScreen(Screen):
 
         streak_title = label_text("STREAK", size=12, color=TEXT_LIGHT, bold=True)
         streak_value = label_text(
-            f"{data.get('streak', 0)} 🔥", size=21, color=TEAL, bold=True
+            f"{data.get('streak', 0)} days", size=21, color=TEAL, bold=True
         )
 
         streak_card.add_widget(streak_title)
@@ -485,7 +485,7 @@ class HomeScreen(Screen):
             done = task.get("done", False)
 
             task_button = Button(
-                text=("✓ " if done else "○ ") + task.get("name", "Task"),
+                text=("[X] " if done else "[  ] ") + task.get("name", "Task"),
                 background_normal="",
                 background_color=GREEN_LIGHT if done else CARD,
                 color=GREEN if done else TEXT,
@@ -520,19 +520,19 @@ class HomeScreen(Screen):
         add_button.bind(on_release=self.show_add_task_popup)
         root.add_widget(add_button)
 
-        time_button = ModernButton(text="⏱ TIME THIEVES")
+        time_button = ModernButton(text="TIME THIEVES")
         time_button.bind(
             on_release=lambda x: setattr(self.manager, "current", "time")
         )
         root.add_widget(time_button)
 
-        progress_button = SmallButton(text="📊 VIEW PROGRESS")
+        progress_button = SmallButton(text="VIEW PROGRESS")
         progress_button.bind(
             on_release=lambda x: setattr(self.manager, "current", "progress")
         )
         root.add_widget(progress_button)
 
-        reset_button = SmallButton(text="↻ RESET / RECOVER")
+        reset_button = SmallButton(text="RESET / RECOVER")
         reset_button.bind(
             on_release=lambda x: setattr(self.manager, "current", "reset")
         )
@@ -1050,7 +1050,7 @@ class ResetScreen(Screen):
             label_text("CURRENT STREAK", 13, TEXT_LIGHT, True)
         )
         streak_card.add_widget(
-            label_text(f"{data.get('streak', 0)} days 🔥", 24, TEAL, True)
+            label_text(f"{data.get('streak', 0)} days", 24, TEAL, True)
         )
 
         root.add_widget(streak_card)
