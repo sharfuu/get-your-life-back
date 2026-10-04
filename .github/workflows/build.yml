@@ -11,11 +11,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -42,13 +41,20 @@ jobs:
         run: |
           yes | sdkmanager --licenses || true
 
-      - name: Install Python dependencies
+      - name: Install Buildozer
         run: |
           python -m pip install --upgrade pip
-          pip install buildozer
-          pip install cython==0.29.34
+          python -m pip install "buildozer==1.5.0"
+          python -m pip install "cython==0.29.34"
+
+      - name: Check Python version
+        run: |
+          python --version
+          python -m pip --version
 
       - name: Build APK
+        env:
+          P4A_PYTHON: "3.11"
         run: |
           yes | buildozer android debug
 
