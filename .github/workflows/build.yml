@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -35,7 +35,10 @@ jobs:
             zlib1g-dev \
             libncurses5-dev \
             libncursesw5-dev \
-            libtinfo5
+            libtinfo5 \
+            cmake \
+            libffi-dev \
+            libssl-dev
 
       - name: Accept Android SDK licenses
         run: |
@@ -47,15 +50,9 @@ jobs:
           python -m pip install "buildozer==1.5.0"
           python -m pip install "cython==0.29.34"
 
-      - name: Check Python version
-        run: |
-          python --version
-          python -m pip --version
-
       - name: Build APK
-        env:
-          P4A_PYTHON: "3.11"
         run: |
+          buildozer android clean
           yes | buildozer android debug
 
       - name: Upload APK
