@@ -505,8 +505,24 @@ class HomeScreen(Screen):
             points.size_hint_x = None
             points.width = dp(50)
 
+            delete_button = Button(
+                text="X",
+                size_hint_x=None,
+                width=dp(44),
+                background_normal="",
+                background_color=BLUE_LIGHT,
+                color=BLUE,
+                bold=True,
+                font_size=dp(14),
+            )
+
+            delete_button.bind(
+                on_release=lambda button, i=index: self.confirm_delete_task(i)
+            )
+
             row.add_widget(task_button)
             row.add_widget(points)
+            row.add_widget(delete_button)
             task_box.add_widget(row)
 
         scroll.add_widget(task_box)
@@ -581,6 +597,67 @@ class HomeScreen(Screen):
         save_today_snapshot(data)
         save_data(data)
         self.build_screen()
+
+    # =====================================================
+    # REMOVE TASK
+    # =====================================================
+
+    def confirm_delete_task(self, index):
+
+        data = self.manager.app_data
+
+        if index >= len(data["tasks"]):
+            return
+
+        task_name = data["tasks"][index].get("name", "this mission")
+
+        box = BoxLayout(
+            orientation="vertical",
+            padding=dp(15),
+            spacing=dp(10),
+        )
+
+        message = label_text(
+            f"Remove '{task_name}' from today's missions?",
+            size=15,
+            color=TEXT,
+        )
+        message.color = (1, 1, 1, 1)
+
+        buttons = BoxLayout(spacing=dp(10), size_hint_y=None, height=dp(48))
+
+        cancel_button = SmallButton(text="CANCEL")
+        remove_button = ModernButton(text="REMOVE")
+
+        buttons.add_widget(cancel_button)
+        buttons.add_widget(remove_button)
+
+        box.add_widget(message)
+        box.add_widget(buttons)
+
+        popup = Popup(
+            title="Remove Mission",
+            content=box,
+            size_hint=(0.88, None),
+            height=dp(220),
+        )
+
+        def remove_task(*args):
+
+            if index < len(data["tasks"]):
+                data["tasks"].pop(index)
+
+            save_today_snapshot(data)
+            save_data(data)
+
+            popup.dismiss()
+
+            self.build_screen()
+
+        cancel_button.bind(on_release=popup.dismiss)
+        remove_button.bind(on_release=remove_task)
+
+        popup.open()
 
     # =====================================================
     # ADD TASK
