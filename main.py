@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 
 from kivy.app import App
 from kivy.metrics import dp
@@ -58,6 +58,21 @@ DEFAULT_TASKS = [
 ]
 
 
+def week_start_iso():
+    today = date.today()
+    return (today - timedelta(days=today.weekday())).isoformat()
+
+
+def default_weekly_mission():
+    return {
+        "name": "Weekly goal: tap EDIT to set yours",
+        "points": 50,
+        "done": False,
+        "xp_awarded": False,
+        "week_start": week_start_iso(),
+    }
+
+
 def create_default_data():
     return {
         "last_date": date.today().isoformat(),
@@ -69,6 +84,7 @@ def create_default_data():
         "completed_days": [],
         "time_thieves": [],
         "history": [],
+        "weekly_mission": default_weekly_mission(),
     }
 
 
@@ -182,6 +198,27 @@ def load_data():
         task.setdefault("done", False)
         task.setdefault("points", 0)
         task.setdefault("xp_awarded", False)
+
+    # -----------------------------------------------------
+    # Weekly mission (resets every Monday)
+    # -----------------------------------------------------
+
+    weekly = data.get("weekly_mission")
+
+    if not isinstance(weekly, dict):
+        weekly = default_weekly_mission()
+        data["weekly_mission"] = weekly
+
+    weekly.setdefault("name", "Weekly goal: tap EDIT to set yours")
+    weekly.setdefault("points", 50)
+    weekly.setdefault("done", False)
+    weekly.setdefault("xp_awarded", False)
+
+    if weekly.get("week_start") != week_start_iso():
+        weekly["done"] = False
+        weekly["xp_awarded"] = False
+        weekly["week_start"] = week_start_iso()
+        save_data(data)
 
     today = date.today().isoformat()
     last_date = data.get("last_date", today)
@@ -409,6 +446,7 @@ class HomeScreen(Screen):
         score = calculate_score(data["tasks"])
 
         score_card = Card()
+        score_card.height = dp(90)
 
         score_title = label_text(
             "LIFE BACK SCORE", size=13, color=TEXT_LIGHT, bold=True
@@ -452,6 +490,58 @@ class HomeScreen(Screen):
         stats.add_widget(streak_card)
         stats.add_widget(xp_card)
         root.add_widget(stats)
+
+        # -------------------------------------------------
+        # Weekly mission
+        # -------------------------------------------------
+
+        weekly = data["weekly_mission"]
+        weekly_done = weekly.get("done", False)
+
+        weekly_title = label_text(
+            "WEEKLY MISSION", size=15, color=TEXT, bold=True
+        )
+        weekly_title.size_hint_y = None
+        weekly_title.height = dp(30)
+        root.add_widget(weekly_title)
+
+        weekly_row = BoxLayout(spacing=dp(8), size_hint_y=None, height=dp(54))
+
+        weekly_button = Button(
+            text=("[X] " if weekly_done else "[  ] ")
+            + weekly.get("name", "Weekly mission"),
+            background_normal="",
+            background_color=GREEN_LIGHT if weekly_done else BLUE_LIGHT,
+            color=GREEN if weekly_done else TEXT,
+            halign="left",
+            valign="middle",
+            font_size=dp(14),
+            bold=True,
+        )
+        weekly_button.bind(on_release=self.toggle_weekly)
+
+        weekly_points = label_text(
+            f"+{weekly.get('points', 0)}", size=14, color=BLUE, bold=True
+        )
+        weekly_points.size_hint_x = None
+        weekly_points.width = dp(50)
+
+        weekly_edit = Button(
+            text="EDIT",
+            size_hint_x=None,
+            width=dp(52),
+            background_normal="",
+            background_color=BLUE_LIGHT,
+            color=BLUE,
+            bold=True,
+            font_size=dp(12),
+        )
+        weekly_edit.bind(on_release=self.show_edit_weekly_popup)
+
+        weekly_row.add_widget(weekly_button)
+        weekly_row.add_widget(weekly_points)
+        weekly_row.add_widget(weekly_edit)
+        root.add_widget(weekly_row)
 
         # -------------------------------------------------
         # Missions title
@@ -555,6 +645,101 @@ class HomeScreen(Screen):
         root.add_widget(reset_button)
 
         self.add_widget(root)
+
+    # =====================================================
+    # WEEKLY MISSION
+    # =====================================================
+
+    def toggle_weekly(self, *args):
+
+        data = self.manager.app_data
+
+        weekly = data["weekly_mission"]
+
+        if not weekly.get("done", False):
+
+            weekly["done"] = True
+
+            # Award XP only once per week
+            if not weekly.get("xp_awarded", False):
+                data["xp"] = data.get("xp", 0) + weekly.get("points", 0)
+                weekly["xp_awarded"] = True
+
+        else:
+
+            weekly["done"] = False
+
+            # XP is NOT removed.
+
+        save_data(data)
+        self.build_screen()
+
+    def show_edit_weekly_popup(self, *args):
+
+        data = self.manager.app_data
+
+        weekly = data["weekly_mission"]
+
+        box = BoxLayout(
+            orientation="vertical",
+            padding=dp(15),
+            spacing=dp(10),
+        )
+
+        name_input = TextInput(
+            text=weekly.get("name", ""),
+            hint_text="Weekly mission",
+            multiline=False,
+            size_hint_y=None,
+            height=dp(45),
+        )
+
+        points_input = TextInput(
+            text=str(weekly.get("points", 50)),
+            hint_text="Bonus points",
+            multiline=False,
+            input_filter="int",
+            size_hint_y=None,
+            height=dp(45),
+        )
+
+        save_button = ModernButton(text="SAVE")
+
+        box.add_widget(name_input)
+        box.add_widget(points_input)
+        box.add_widget(save_button)
+
+        popup = Popup(
+            title="Edit Weekly Mission",
+            content=box,
+            size_hint=(0.88, None),
+            height=dp(260),
+        )
+
+        def save_weekly(*args):
+
+            name = name_input.text.strip()
+
+            if not name:
+                return
+
+            try:
+                points = int(points_input.text)
+            except Exception:
+                points = 50
+
+            weekly["name"] = name
+            weekly["points"] = points
+
+            save_data(data)
+
+            popup.dismiss()
+
+            self.build_screen()
+
+        save_button.bind(on_release=save_weekly)
+
+        popup.open()
 
     # =====================================================
     # XP TASK TOGGLE
@@ -1076,7 +1261,10 @@ class ProgressScreen(Screen):
 
 class ResetScreen(Screen):
 
+    status = ""
+
     def on_enter(self):
+        self.status = ""
         self.build_screen()
 
     def build_screen(self):
@@ -1088,7 +1276,7 @@ class ResetScreen(Screen):
         root = BoxLayout(
             orientation="vertical",
             padding=dp(18),
-            spacing=dp(12),
+            spacing=dp(10),
         )
 
         back = create_back_button()
@@ -1101,18 +1289,14 @@ class ResetScreen(Screen):
         root.add_widget(title)
 
         message = Card()
-        message.height = dp(170)
+        message.height = dp(110)
 
         message.add_widget(
-            label_text("You don't need a perfect day.", 18, TEXT, True)
-        )
-        message.add_widget(
-            label_text("Start with one small win.", 15, TEXT_LIGHT)
+            label_text("You don't need a perfect day.", 17, TEXT, True)
         )
         message.add_widget(
             label_text(
-                "Complete one mission, put the phone away, "
-                "and get back on track.",
+                "Start with one small win and get back on track.",
                 14,
                 TEXT_LIGHT,
             )
@@ -1120,31 +1304,160 @@ class ResetScreen(Screen):
 
         root.add_widget(message)
 
+        stats = BoxLayout(spacing=dp(10), size_hint_y=None, height=dp(90))
+
         streak_card = Card()
-        streak_card.height = dp(100)
-
+        streak_card.padding = dp(12)
+        streak_card.add_widget(label_text("CURRENT STREAK", 12, TEXT_LIGHT, True))
         streak_card.add_widget(
-            label_text("CURRENT STREAK", 13, TEXT_LIGHT, True)
+            label_text(f"{data.get('streak', 0)} days", 21, TEAL, True)
         )
-        streak_card.add_widget(
-            label_text(f"{data.get('streak', 0)} days", 24, TEAL, True)
-        )
-
-        root.add_widget(streak_card)
 
         best_card = Card()
-        best_card.height = dp(100)
-
-        best_card.add_widget(label_text("BEST STREAK", 13, TEXT_LIGHT, True))
+        best_card.padding = dp(12)
+        best_card.add_widget(label_text("BEST STREAK", 12, TEXT_LIGHT, True))
         best_card.add_widget(
-            label_text(f"{data.get('best_streak', 0)} days", 24, BLUE, True)
+            label_text(f"{data.get('best_streak', 0)} days", 21, BLUE, True)
         )
 
-        root.add_widget(best_card)
+        stats.add_widget(streak_card)
+        stats.add_widget(best_card)
+        root.add_widget(stats)
+
+        status_label = label_text(self.status, 14, GREEN, True)
+        status_label.size_hint_y = None
+        status_label.height = dp(30)
+        root.add_widget(status_label)
+
+        reset_button = ModernButton(text="RESET TODAY'S MISSIONS")
+        reset_button.bind(on_release=self.reset_today_missions)
+        root.add_widget(reset_button)
+
+        restore_button = SmallButton(text="RESTORE DEFAULT MISSIONS")
+        restore_button.bind(on_release=self.restore_default_missions)
+        root.add_widget(restore_button)
+
+        clear_button = SmallButton(text="CLEAR TODAY'S TIME THIEVES")
+        clear_button.bind(on_release=self.clear_time_thieves)
+        root.add_widget(clear_button)
+
+        streak_button = SmallButton(text="START FRESH (RESET STREAK)")
+        streak_button.bind(on_release=self.confirm_reset_streak)
+        root.add_widget(streak_button)
 
         root.add_widget(Widget())
 
         self.add_widget(root)
+
+    # =====================================================
+    # ACTIONS
+    # =====================================================
+
+    def reset_today_missions(self, *args):
+
+        data = self.manager.app_data
+
+        for task in data["tasks"]:
+            task["done"] = False
+
+        # XP already earned is kept.
+
+        save_today_snapshot(data)
+        save_data(data)
+
+        self.status = "Today's missions reset. XP kept."
+        self.build_screen()
+
+    def restore_default_missions(self, *args):
+
+        data = self.manager.app_data
+
+        existing = {task.get("name") for task in data["tasks"]}
+
+        restored = 0
+
+        for task in DEFAULT_TASKS:
+            if task["name"] not in existing:
+                data["tasks"].append(dict(task))
+                restored += 1
+
+        save_today_snapshot(data)
+        save_data(data)
+
+        if restored:
+            self.status = f"Restored {restored} default mission(s)."
+        else:
+            self.status = "All default missions are already there."
+
+        self.build_screen()
+
+    def clear_time_thieves(self, *args):
+
+        data = self.manager.app_data
+
+        today = date.today().isoformat()
+
+        data["time_thieves"] = [
+            item
+            for item in data.get("time_thieves", [])
+            if item.get("date") != today
+        ]
+
+        save_today_snapshot(data)
+        save_data(data)
+
+        self.status = "Today's time thieves cleared."
+        self.build_screen()
+
+    def confirm_reset_streak(self, *args):
+
+        data = self.manager.app_data
+
+        box = BoxLayout(
+            orientation="vertical",
+            padding=dp(15),
+            spacing=dp(10),
+        )
+
+        message = label_text(
+            "Reset your current streak to 0? Your best streak and XP are kept.",
+            size=15,
+            color=(1, 1, 1, 1),
+        )
+
+        buttons = BoxLayout(spacing=dp(10), size_hint_y=None, height=dp(48))
+
+        cancel_button = SmallButton(text="CANCEL")
+        confirm_button = ModernButton(text="RESET")
+
+        buttons.add_widget(cancel_button)
+        buttons.add_widget(confirm_button)
+
+        box.add_widget(message)
+        box.add_widget(buttons)
+
+        popup = Popup(
+            title="Start Fresh",
+            content=box,
+            size_hint=(0.88, None),
+            height=dp(230),
+        )
+
+        def reset_streak(*args):
+
+            data["streak"] = 0
+
+            save_data(data)
+
+            popup.dismiss()
+
+            self.status = "Streak reset. Fresh start!"
+            self.build_screen()
+
+        cancel_button.bind(on_release=popup.dismiss)
+        confirm_button.bind(on_release=reset_streak)
+
+        popup.open()
 
 
 # =========================================================
