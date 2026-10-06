@@ -281,10 +281,14 @@ def load_data():
             data["best_streak"] = data["streak"]
 
         # ---------------------------------------------
-        # Fresh tasks for today
+        # Keep the same missions, just uncheck them
+        # (added missions stay until you remove them)
         # ---------------------------------------------
 
-        data["tasks"] = [dict(task) for task in DEFAULT_TASKS]
+        data["tasks"] = [
+            dict(task, done=False, xp_awarded=False)
+            for task in data.get("tasks", [])
+        ]
         data["last_date"] = today
 
         save_data(data)
